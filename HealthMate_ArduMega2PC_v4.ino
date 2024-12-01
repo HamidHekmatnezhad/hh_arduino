@@ -11,16 +11,17 @@ char server[] = "192.168.2.50"; //IP address of your computer.
 EthernetClient client;
 
 // variables 
-bool flg=false;
+String flg;
 unsigned short delay_time=1000;
 unsigned int heartbeat;
-unsigned float temperature, weight, oxygen;
+float temperature, weight, oxygen;
+String result;
 
 // Define TX and RX pins for UART 
 // conncetion 1 
-#define TXD1 19
-#define RXD1 21
-HardwareSerial Serial_conn1(1);
+// #define TXD1 19
+// #define RXD1 21
+// HardwareSerial Serial1(1);
 
 // connection 2
 // #define TXD2 18
@@ -45,7 +46,7 @@ void setup() {
   pinMode(30,OUTPUT);
 
   // set up for UART 
-  Serial_conn1.begin(115200, SERIAL_8N1, RXD1, TXD1); // bayad serail port tarrif beshe baraye har esp
+  // Serial_conn1.begin(115200, SERIAL_8N1, RXD1, TXD1); // bayad serail port tarrif beshe baraye har esp
   // Serial_conn2.begin(404, SERIAL_8N1, RXD2, TXD2);
   // Serial_conn3.begin(404, SERIAL_8N1, RXD3, TXD3;
 
@@ -55,37 +56,33 @@ void loop() {
 
 ReadServer(); // check connect to server
 delay(delay_time);
-flg = httpRequest(); // get flag value
+print_flag(); // get flag value
+get_data("xflag=", "endf");
+Serial.print(result);
 
-if (flg) { // access to collect data from another Microcontroller
-  // serial port for esp32 s conn1 
-  GetData_esp32_1();
-  // serial port - uart
+if (result == "1") { // access to collect data from another Microcontroller
+  // GetData_esp32_1();
+  Serial.println("Hi");
 
-  // write collected data to server
-  Write2Server(client, heartbeat, oxygen, temperature, weight); // TODO mishe vasashon ye return tarif kard ke beshe bahash log va ro ye display namayesh dad.
-  Write2Flag(client); // TODO "
+  // Write2Server(client, heartbeat, oxygen, temperature, weight); // TODO mishe vasashon ye return tarif kard ke beshe bahash log va ro ye display namayesh dad.
+  // Write2Flag(client); // TODO "
 }
 delay(delay_time);
-
-
-// LCDdispServ(); // nemidonam vase chi hastesh
-// delay(1000);
-// request=""; // mani nemide request meghdari ke to connection server gerefte sql in vast kari nakarde
+request="";
 }
 
-void ReadServer() { // check connection to server --Done--
+void ReadServer() {
     while (client.available()) {
     char c = client.read();
     String mystring(c);
-    request = mystring; // ### request+=mystring;  in ye moshkel dare vase har dor hey behesh ezafe mishe. ham vase RAM khob nist ham ma enghadr etelaat nemikhaym
+    request+=mystring;
   }
-  Serial.print("Flag = "); // dar inja kolan meghdar flag ro nemikhone in flag e connection hast na meghdar i ke dar database hastesh
+  Serial.print("Flag = ");
   Serial.println(request);
 
 }
 
-bool httpRequest() { // read flag from server  --Done--
+void print_flag() { // read flag from server  --Done--
   client.stop();
   if (client.connect(server, 80)) {
    
@@ -94,30 +91,7 @@ bool httpRequest() { // read flag from server  --Done--
     client.println("Host: 192.168.2.50");
     client.println("Connection: close");
     client.println();
-    unsigned long time_start = millis(); // get time
-    unsigned long time_end;
-    unsigned long timer = 0;
 
-    while (client.connected() && timer < (5 * 1000)) { 
-      if (client.available()) {
-        String line = client.readStirngUntil('\n') // 'endf'  // char c = client.read();
-        Serial.println(line);
-      }
-      if (line.length() > 0) { // ###
-        // bayad baresi beshe chi ro migire
-        //    agar 1 ya 0 hastesh faghat hamin meghdar ro returen midim 
-        //    va age ye string hastesh ke tosh salt hastehs bayad faghat on megdar ro bekeshim birmon
-
-        // farz bar in gerefte shode ke faghat meghdare flag besorate string gerefte shode
-        if (line=="1") return true;       // arduino  mitone  roye server write kone    
-        else if (line=="0") return false; // arduino nemitone roye server write kone 
-      }
-    }
-    
-    time_end = millis(); 
-    timer = time_end - time_start; // ye check bayad beshe meghdaresh manteghi hast ya khyr
-    // print("##############################  ");
-    // println(timer);
   } else {
     Serial.println("connection failed");
   }
@@ -181,19 +155,20 @@ void Write2Flag(EthernetClient client) { // --Done--
        }
  }
 
-void GetData_esp32_1(void) { // bayd rosh kar beshe  --Done-- 
-  if (Serial_conn1.available()) {
-    String data = Serial_conn1.readStringUntil('\n'); // 'end'
-    if (data.indexOf("sensor") >= 0) {
-      // read data from serial
-      // String sens_1 = data.substring(data.indexOf("sens_1=") + 7, data.indexOf("sens_2="));
-      return data
-    }
-  }
-}
+// void GetData_esp32_1(void) { // bayd rosh kar beshe  --Done-- 
+//   if (Serial_conn1.available()) {
+//     String data = Serial_conn1.readStringUntil('\n'); // 'end'
+//     if (data.indexOf("sensor") >= 0) {
+//       // read data from serial
+//       // String sens_1 = data.substring(data.indexOf("sens_1=") + 7, data.indexOf("sens_2="));
+//       return data;
+//     }
+//   }
+// }
 
 
  void LCDdispServ () {
+
   //Serial.print("Request Length = ");
   //Serial.println(request.length());
   if (request.length()<10){
@@ -208,9 +183,9 @@ void GetData_esp32_1(void) { // bayd rosh kar beshe  --Done--
   Serial.println(RelStatus);
   if ((RelStatus== "1")) {
      digitalWrite(30, HIGH);
-     Write2Server(client);
+    //  Write2Server(client);
      delay(2000);
-     Write2Flag(client);
+    //  Write2Flag(client);
      }
 if (RelStatus== "0") {
      digitalWrite(30, LOW);
@@ -218,3 +193,18 @@ if (RelStatus== "0") {
     
    }
  }
+
+void get_data(String start, String end) {
+  if (request.length()<10){
+      Serial.print("Waiting for Server..");
+      }else{
+  String H_Rel = start; 
+  int Relstart = request.indexOf(H_Rel);
+  String F_Rel = end;
+  int Relstop = request.indexOf(F_Rel);
+  String RelStatus = request.substring(Relstart+H_Rel.length(), Relstop);
+  Serial.print("RelStatus: ");
+  Serial.println(RelStatus);
+  result = RelStatus;
+  }
+}
