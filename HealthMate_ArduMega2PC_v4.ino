@@ -64,6 +64,12 @@ if (result == "1") { // access to collect data from another Microcontroller
   // GetData_esp32_1();
   Serial.println("Hi");
 
+  // for test
+  Write2Server();
+  Write2Flag();
+  result = "0";
+
+
   // Write2Server(client, heartbeat, oxygen, temperature, weight); // TODO mishe vasashon ye return tarif kard ke beshe bahash log va ro ye display namayesh dad.
   // Write2Flag(client); // TODO "
 }
@@ -98,7 +104,7 @@ void print_flag() { // read flag from server  --Done--
 }
 
 
-void Write2Server(EthernetClient client, int heartbeat, float oxygen, float temperature, float weight) { // --Done--
+void Write2Server() { // --Done--
     
       if(client.connect(server, 80)){
       Serial.println("connected R1");
@@ -115,7 +121,7 @@ void Write2Server(EthernetClient client, int heartbeat, float oxygen, float temp
       // +----------------------+
       
       // testing
-      // heartbeat = 80; oxygen = 95.0; temperature = 36.5; weight = 70.0;
+      heartbeat = 80; oxygen = 95.0; temperature = 36.5; weight = 70.0;
 
       // send data
       client.print("sens_1=");
@@ -137,7 +143,7 @@ void Write2Server(EthernetClient client, int heartbeat, float oxygen, float temp
       }
  }
 
-void Write2Flag(EthernetClient client) { // --Done--
+void Write2Flag() { // --Done--
     
        if(client.connect(server, 80)){
        Serial.println("connected R2");
