@@ -12,30 +12,19 @@ EthernetClient client;
 
 // variables 
 String flg;
-unsigned short delay_time=1000;
+unsigned long end_time, start_time;
+unsigned short delay_time=1000, delay_get_data=3000;
 unsigned int heartbeat;
 float temperature, weight, oxygen;
 String result;
-
-// Define TX and RX pins for UART 
-// conncetion 1 
-// #define TXD1 19
-// #define RXD1 21
-// HardwareSerial Serial1(1);
-
-// connection 2
-// #define TXD2 18
-// #define RXD2 20
-// HardwareSerial Serial_conn2(2);
-
-// coccention 3
-// #define TXD3 17
-// #define RXD3 16
-// HardwareSerial Serial_conn3(3);
+String heartbeats_r="-1", oxygen_r="-1", weight_r="-1", temperature_r="-1";
 
 void setup() {
 
   Serial.begin(9600);
+
+  // serial for uart
+
   Serial.println(F("Initialize System"));
 
   Ethernet.begin(mac, ip);
@@ -44,11 +33,6 @@ void setup() {
   Serial.print(F("IP Address: "));
   Serial.println(Ethernet.localIP());
   pinMode(30,OUTPUT);
-
-  // set up for UART 
-  // Serial_conn1.begin(115200, SERIAL_8N1, RXD1, TXD1); // bayad serail port tarrif beshe baraye har esp
-  // Serial_conn2.begin(404, SERIAL_8N1, RXD2, TXD2);
-  // Serial_conn3.begin(404, SERIAL_8N1, RXD3, TXD3;
 
 }
 
@@ -61,19 +45,72 @@ get_data("xflag=", "endf");
 Serial.print(result);
 
 if (result == "1") { // access to collect data from another Microcontroller
-  // GetData_esp32_1();
   Serial.println("Hi");
 
-  // for test
-  Write2Server();
+  // Get data from another microcontroller
+  // 1. check: is person there
+  // 2. a delay for 3 seconds
+  // 3. get data: heartbeat and oxygen
+  // 4. get data: weight
+  // 5. get data: temperature --cancelled--
+
+  get_data("xheight=", "endh");
+  if (result == "true"){
+    start_time = milist();
+    while (true){
+    delay(delay_get_data);
+    
+    // -------------- BPN --------------
+    read_uart("bpn");
+    // ReadServer(); // bayad dobare serial port khonde beshe. to khode func read_uart hastesh --check beshe--
+    get_data("heartbeat=", "endhb");
+    heartbeats_r = result;
+    get_data("oxygen=", "endo");
+    oxygen_r = result;
+    // ---------------------------------
+
+    // -------------- weight --------------
+    // age serial port khast bayad ezafe beshe
+    get_data("weight=", "endw");
+    weight_r = result;
+    // ------------------------------------
+
+    // -------------- temperature --------------
+    // cancelled 
+    temperature_r = "0";
+
+    // -----------------------------------------
+
+    if (heartbeats_r != "-1" && oxygen_r != "-1" && weight_r != "-1" && temperature != "-1"){
+      Serial.print("Heartbeats: ");
+      Serial.print(heartbeats_r);
+      Serial.print(", Oxygen: ");
+      Serial.print(oxygen_r);
+      Serial.print(", Weight: ");
+      Serial.print(weight_r);
+      Serial.print(", Temperature: ");
+      Serial.print(temperature_r);
+
+      break;
+    }
+    end_time = milist();
+
+    if (end_time - start_time > delay_get_data * 10){
+      break;
+    }
+    }
+  }
+
+  if (heartbeats_r != "-1" && oxygen_r != "-1" && weight_r != "-1" && temperature != "-1"){
+  Write2Server(heartbeats_r, oxygen_r, weight_r, temperature_r);
   Write2Flag();
+  }
+  // for test
+
   result = "0";
-
-
-  // Write2Server(client, heartbeat, oxygen, temperature, weight); // TODO mishe vasashon ye return tarif kard ke beshe bahash log va ro ye display namayesh dad.
-  // Write2Flag(client); // TODO "
 }
 delay(delay_time);
+heartbeats_r="-1", oxygen_r="-1", weight_r="-1", temperature_r="-1";
 request="";
 }
 
@@ -88,7 +125,7 @@ void ReadServer() {
 
 }
 
-void print_flag() { // read flag from server  --Done--
+void print_flag() { // read flag from server  
   client.stop();
   if (client.connect(server, 80)) {
    
@@ -103,8 +140,7 @@ void print_flag() { // read flag from server  --Done--
   }
 }
 
-
-void Write2Server() { // --Done--
+void Write2Server(int heartbeat, float oxygen, float weight_kg, float temperature) { 
     
       if(client.connect(server, 80)){
       Serial.println("connected R1");
@@ -121,7 +157,7 @@ void Write2Server() { // --Done--
       // +----------------------+
       
       // testing
-      heartbeat = 80; oxygen = 95.0; temperature = 36.5; weight = 70.0;
+      // heartbeat = 80; oxygen = 95.0; temperature = 36.5; weight = 70.0;
 
       // send data
       client.print("sens_1=");
@@ -132,8 +168,8 @@ void Write2Server() { // --Done--
       client.print(weight);
       client.print("&sens_4=");
       client.print(temperature);
-      client.print("&sens_5=");
-      client.println(999);
+      // client.print("&sens_5=");
+      // client.println(999);
 
       client.stop(); //Closing the connection
       }
@@ -145,21 +181,21 @@ void Write2Server() { // --Done--
 
 void Write2Flag() { // --Done--
     
-       if(client.connect(server, 80)){
-       Serial.println("connected R2");
-       Serial.println("Uploading....   +++++++++++++++++++++++    ");
-       client.print("GET /sql_personal_data/write_flag_to_server.php?"); //Connecting and Sending values to database
+    if(client.connect(server, 80)){
+    Serial.println("connected R2");
+    Serial.println("Uploading....   +++++++++++++++++++++++    ");
+    client.print("GET /sql_personal_data/write_flag_to_server.php?"); //Connecting and Sending values to database
 
-       client.print("flagg=");
-       client.println(0);
-       
-       client.stop(); //Closing the connection
-       }
-       else {
-       // if you didn't get a connection to the server:
-       Serial.println("Upload Failed       ");
-       }
- }
+    //  client.print("flagg=");
+    //  client.println(0);
+
+    client.stop(); //Closing the connection
+    }
+    else {
+    // if you didn't get a connection to the server:
+    Serial.println("Upload Failed       ");
+    }
+  }
 
 // void GetData_esp32_1(void) { // bayd rosh kar beshe  --Done-- 
 //   if (Serial_conn1.available()) {
@@ -171,34 +207,6 @@ void Write2Flag() { // --Done--
 //     }
 //   }
 // }
-
-
- void LCDdispServ () {
-
-  //Serial.print("Request Length = ");
-  //Serial.println(request.length());
-  if (request.length()<10){
-      Serial.print("Waiting for Server..");
-      }else{
-  String H_Rel = "xflag=";
-  int Relstart = request.indexOf(H_Rel);
-  String F_Rel = "endf";
-  int Relstop = request.indexOf(F_Rel);
-  String RelStatus = request.substring(Relstart+H_Rel.length(), Relstop);
-  Serial.print("RelStatus: ");
-  Serial.println(RelStatus);
-  if ((RelStatus== "1")) {
-     digitalWrite(30, HIGH);
-    //  Write2Server(client);
-     delay(2000);
-    //  Write2Flag(client);
-     }
-if (RelStatus== "0") {
-     digitalWrite(30, LOW);
-    }
-    
-   }
- }
 
 void get_data(String start, String end) {
   if (request.length()<10){
@@ -214,3 +222,25 @@ void get_data(String start, String end) {
   result = RelStatus;
   }
 }
+
+void read_uart(String option) {
+  // faghat maghadir az serial port migire va roye serial port 0 minivise 
+  // khondane etelaat az func get_data hastesh
+  switch (option) {
+    case "bpn":
+      // az serial khodesh mikhonim bad ro serial print mikonim
+      // felan malom nist serial ha
+      break;
+    
+    case "temp":
+      // az serial khodesh mikhonim bad ro serial print mikonim 
+      // felan malom nist serial ha
+      // va bakhshe tempreture ghate
+      break;
+
+    case "weight":
+      // agar niyaz be uart dasht
+      break;
+    }
+  ReadServer(); 
+  }  
