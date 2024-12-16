@@ -10,16 +10,9 @@ EthernetClient client;
 
 // variables
 unsigned long end_time, start_time;
-unsigned short delay_time=500, delay_get_data=2000;
+unsigned short delay_time=1000, delay_get_data=2000;
 String heartbeats_r="-1", oxygen_r="-1", weight_r="-1", temperature_r="-1", flg="";
 int counter=0, cc=5;
-
-// this data, setting for serial port read DATA 
-int wsp = 1; // for weight.
-int hsp = 1; // for hearthbeats
-int osp = 1; // for oxygen
-int tsp = 0; // for tempreture
-
 
 void setup() {
 
@@ -49,72 +42,15 @@ print_flag(); // get flag value
 flg = get_data("xflag=", "endf");
 Serial.println(flg);
 
+heartbeats_r="23"; oxygen_r="76"; weight_r="54"; temperature_r="42";
+
 if (flg == "1") { // access to collect data from another Microcontroller
   Serial.println("---------------<< Flag 1 >>---------------");
-  bool status[4];
-  for (int i=0; i<4; i++) status[i]=true; // true: yet not get data 
-
-//   if (result == "true"){
-  if (true){ 
-    start_time = millis();
-    while (true){
-    delay(delay_get_data);
-    Serial.println("---------------<< getting data >>---------------");
-
-    // -------------- weight (1) --------------
-    counter = 0;
-    while (status[0] && (counter<cc)){
-      weight_r = read_uart(wsp, "weight=", "endw");
-      if (weight_r != "-1") status[0] = false;
-    counter++;
-    }
-    // ----------------------------------------    
-
-    // -------------- BPN (2) --------------
-    counter = 0;
-    while (status[1] && (counter<cc)){
-      heartbeats_r = read_uart(hsp, "heartbeat=", "endhb");
-      if (heartbeats_r != "-1") status[1] = false;
-    counter++;
-    }
-
-    counter = 0;
-    while (status[2] && counter<cc){
-      oxygen_r = read_uart(osp, "oxygen=", "endo");
-      if (oxygen_r != "-1") status[2] = false;
-    counter++;
-    }
-    // -------------------------------------
-
-    // -------------- temperature (3) --------------
-    // cancelled
-    temperature_r = "0"; status[3] = false; // for test
-    // ---------------------------------------------
-
-    if (true ^ (status[0] || status[1] || status[2] || status[3])){ // ^ == XOR
-      Serial.print("Heartbeats: ");    Serial.print(heartbeats_r);
-      Serial.print(", Oxygen: ");      Serial.print(oxygen_r);
-      Serial.print(", Weight: ");      Serial.print(weight_r);
-      Serial.print(", Temperature: "); Serial.println(temperature_r);
-      break;
-    }
-    end_time = millis();
-    Serial.print("\n\t\t\tTIMER: ");
-    Serial.print(end_time - start_time);
-    Serial.print('\n');
-
-    if (end_time - start_time > delay_get_data * 10) break;
-
-    }
-  }
-  if (true ^ (status[0] || status[1] || status[2] || status[3])){
-    Write2Server(client, heartbeats_r, oxygen_r, weight_r, temperature_r);
+    // Write2Server(heartbeats_r, oxygen_r, weight_r, temperature_r);
     Write2Flag(client);
   }
-}
 delay(delay_time);
-heartbeats_r="-1"; oxygen_r="-1"; weight_r="-1"; temperature_r="-1";
-flg="";request="";
+request="";
 }
 
 void ReadServer() {
@@ -144,11 +80,11 @@ void print_flag() {
   }
 }
 
-void Write2Server(EthernetClient client, String heartbeat, String oxygen, String weight_kg, String temperature) {
+void Write2Server(String heartbeat, String oxygen, String weight_kg, String temperature) {
    
       if(client.connect(server, 80)){
         Serial.println("Uploading.... (Write2Server)");
-        client.print("GET /sql_personal_data/write_variables_to_server.php?"); //Connecting and Sending values to database
+        // client.print("GET /sql_personal_data/write_variables_to_server.php?"); //Connecting and Sending values to database
 
         // +----------------------+
         // | sens_1 = hearthbeat  |
@@ -157,20 +93,30 @@ void Write2Server(EthernetClient client, String heartbeat, String oxygen, String
         // | sens_4 = temperature |
         // | sens_5 = None        |
         // +----------------------+
+        // local/sql_personal_data/write_variables_to_server.php?sens_1=32&sens_2=32&sens_3=32&sens_4=32
       
         // send data
-        client.print("sens_1=");
-        client.print(heartbeat);
-        client.print("&sens_2=");
-        client.print(oxygen);
-        client.print("&sens_3=");
-        client.print(weight_kg);
-        client.print("&sens_4=");
-        client.print(temperature);
+        // client.print("sens_1=");
+        // client.print(heartbeats_r);
+        // client.print("&sens_2=");
+        // client.print(oxygen_r);
+        // client.print("&sens_3=");
+        // client.print(weight_r);
+        // client.print("&sens_4=");
+        // client.print(temperature_r);
         // client.print("&sens_5=");
         // client.println(999);
 
-        client.println(" ");
+        String u,u1,u2,u3,u4,u5;
+
+        u1 = "GET /sql_personal_data/write_variables_to_server.php?";
+        u2 = "sens_1=" + heartbeats_r;
+        u3 = "&sens_2=" + oxygen_r;
+        u4 = "sens_3=" + weight_r;
+        u5 = "&sens_4=" + temperature_r + "\n";
+        u = u1 + u2 + u3 + u4 + u5;
+        client.print(u); //Connecting and Sending values to database
+        // client.println()
 
         client.stop(); //Closing the connection
       }
@@ -178,6 +124,7 @@ void Write2Server(EthernetClient client, String heartbeat, String oxygen, String
         // if you didn't get a connection to the server:
         Serial.println("Upload Failed!!!!! - (write2server)");
       }
+
  }
 
 void Write2Flag(EthernetClient client) {
@@ -185,7 +132,7 @@ void Write2Flag(EthernetClient client) {
     if(client.connect(server, 80)){
     Serial.println("Uploading.... (Write2Flag)");
     client.print("GET /sql_personal_data/write_flag_to_server.php?"); //Connecting and Sending values to database
-    client.println(" "); // this is important
+    client.println(" ");
 
     client.stop(); //Closing the connection
     }
@@ -233,3 +180,4 @@ String read_uart(int serial_port, String startStr, String endStr) {
   if (ans == "") return "-1";
   else return ans;
 }
+

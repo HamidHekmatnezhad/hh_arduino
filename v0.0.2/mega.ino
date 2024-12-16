@@ -10,16 +10,8 @@ EthernetClient client;
 
 // variables
 unsigned long end_time, start_time;
-unsigned short delay_time=500, delay_get_data=2000;
+unsigned short delay_time=1000, delay_get_data=2000;
 String heartbeats_r="-1", oxygen_r="-1", weight_r="-1", temperature_r="-1", flg="";
-int counter=0, cc=5;
-
-// this data, setting for serial port read DATA 
-int wsp = 1; // for weight.
-int hsp = 1; // for hearthbeats
-int osp = 1; // for oxygen
-int tsp = 0; // for tempreture
-
 
 void setup() {
 
@@ -51,9 +43,10 @@ Serial.println(flg);
 
 if (flg == "1") { // access to collect data from another Microcontroller
   Serial.println("---------------<< Flag 1 >>---------------");
-  bool status[4];
-  for (int i=0; i<4; i++) status[i]=true; // true: yet not get data 
+  bool status[3];
+  for (int i=0; i<3; i++) status[i]=true; // true: yet not get data 
 
+//   String ht = get_data("xheight=", "endh");
 //   if (result == "true"){
   if (true){ 
     start_time = millis();
@@ -61,55 +54,48 @@ if (flg == "1") { // access to collect data from another Microcontroller
     delay(delay_get_data);
     Serial.println("---------------<< getting data >>---------------");
 
-    // -------------- weight (1) --------------
-    counter = 0;
-    while (status[0] && (counter<cc)){
-      weight_r = read_uart(wsp, "weight=", "endw");
+    // -------------- weight --------------
+    if (status[0]){
+      read_uart("weight");
+      weight_r = get_data("weight=", "endw");
       if (weight_r != "-1") status[0] = false;
-    counter++;
     }
-    // ----------------------------------------    
+    // ------------------------------------    
 
-    // -------------- BPN (2) --------------
-    counter = 0;
-    while (status[1] && (counter<cc)){
-      heartbeats_r = read_uart(hsp, "heartbeat=", "endhb");
-      if (heartbeats_r != "-1") status[1] = false;
-    counter++;
+    // -------------- BPN --------------
+    if (status[1]){
+      read_uart("weight"); // for test *********************************************************
+      // read_uart("bpn");
+      heartbeats_r = get_data("heartbeat=", "endhb");
+      oxygen_r = get_data("oxygen=", "endo");
+      if ((heartbeats_r != "-1") && (oxygen_r != "-1")) status[1] = false;
     }
+    // ---------------------------------
 
-    counter = 0;
-    while (status[2] && counter<cc){
-      oxygen_r = read_uart(osp, "oxygen=", "endo");
-      if (oxygen_r != "-1") status[2] = false;
-    counter++;
-    }
-    // -------------------------------------
-
-    // -------------- temperature (3) --------------
+    // -------------- temperature --------------
     // cancelled
-    temperature_r = "0"; status[3] = false; // for test
-    // ---------------------------------------------
+    temperature_r = "0"; status[2] = false; // for test
+    // -----------------------------------------
 
-    if (true ^ (status[0] || status[1] || status[2] || status[3])){ // ^ == XOR
+    if (true ^ (status[0] || status[1] || status[2])){ // ^ == XOR
       Serial.print("Heartbeats: ");    Serial.print(heartbeats_r);
       Serial.print(", Oxygen: ");      Serial.print(oxygen_r);
       Serial.print(", Weight: ");      Serial.print(weight_r);
       Serial.print(", Temperature: "); Serial.println(temperature_r);
+
       break;
     }
     end_time = millis();
     Serial.print("\n\t\t\tTIMER: ");
     Serial.print(end_time - start_time);
-    Serial.print('\n');
 
     if (end_time - start_time > delay_get_data * 10) break;
 
     }
   }
-  if (true ^ (status[0] || status[1] || status[2] || status[3])){
-    Write2Server(client, heartbeats_r, oxygen_r, weight_r, temperature_r);
-    Write2Flag(client);
+  if (true ^ (status[0] || status[1] || status[2])){
+    Write2Server(heartbeats_r, oxygen_r, weight_r, temperature_r);
+    Write2Flag();
   }
 }
 delay(delay_time);
@@ -126,6 +112,7 @@ void ReadServer() {
   }
   Serial.print("request: ");
   Serial.println(request);
+
 }
 
 void print_flag() { 
@@ -140,14 +127,15 @@ void print_flag() {
     client.println();
 
   } else {
-    Serial.println("connection failed - (print_flag)");
+    Serial.println("connection failed");
   }
 }
 
-void Write2Server(EthernetClient client, String heartbeat, String oxygen, String weight_kg, String temperature) {
+void Write2Server(String heartbeat, String oxygen, String weight_kg, String temperature) {
    
       if(client.connect(server, 80)){
-        Serial.println("Uploading.... (Write2Server)");
+        Serial.println("connected R1");
+        Serial.println("Uploading....       ");
         client.print("GET /sql_personal_data/write_variables_to_server.php?"); //Connecting and Sending values to database
 
         // +----------------------+
@@ -170,22 +158,20 @@ void Write2Server(EthernetClient client, String heartbeat, String oxygen, String
         // client.print("&sens_5=");
         // client.println(999);
 
-        client.println(" ");
-
         client.stop(); //Closing the connection
       }
       else {
         // if you didn't get a connection to the server:
-        Serial.println("Upload Failed!!!!! - (write2server)");
+        Serial.println("Upload Failed!!!!! ");
       }
  }
 
-void Write2Flag(EthernetClient client) {
+void Write2Flag() {
    
     if(client.connect(server, 80)){
-    Serial.println("Uploading.... (Write2Flag)");
+    Serial.println("connected");
+    Serial.println("Uploading....");
     client.print("GET /sql_personal_data/write_flag_to_server.php?"); //Connecting and Sending values to database
-    client.println(" "); // this is important
 
     client.stop(); //Closing the connection
     }
@@ -196,7 +182,9 @@ void Write2Flag(EthernetClient client) {
   }
 
 String get_data(String start, String end) {
-  
+  if (request.length()<10){
+      Serial.print("Waiting for Server..");
+      }else{
   String H_Rel = start;
   int Relstart = request.indexOf(H_Rel);
   String F_Rel = end;
@@ -204,32 +192,48 @@ String get_data(String start, String end) {
   String RelStatus = request.substring(Relstart+H_Rel.length(), Relstop);
   Serial.print("RelStatus: ");
   Serial.println(RelStatus);
-  if (RelStatus != "-1") return RelStatus; 
+  return RelStatus;
+
+  }
 }
 
-String read_uart(int serial_port, String startStr, String endStr) {
+void read_uart(String option) {
+  
+  //                +-----------------------+
+  //                | Serial 1: Weight      |
+  //                | Serial 2: BPN         |
+  //                | Serial 3: Temperature |
+  //                +-----------------------+
 
-  String data, ans;
-  switch (serial_port)
-  {
-  case 1:
-    data = Serial1.readStringUntil('\n');
-    break;
-  
-  case 2:
-    data = Serial2.readStringUntil('\n');
-    break;
-  
-  case 3:
-    data = Serial3.readStringUntil('\n');
-    break;
-  }
+  // ------------------------ weight ------------------------
+  if (option == "weight")
+    if(Serial1.available()){
+        String msg = Serial1.readStringUntil('\n');
+        Serial.println("Weight from Serial1: ");
+        Serial.println(msg);
+    }
+    else Serial.print("\tSerial1 is not available!!! >> 1");
+  // --------------------------------------------------------
 
-  Serial.println(">>>>>>>>>>>>>>> " + data);
-  int s = data.indexOf(startStr) + startStr.length() ;
-  int e = data.indexOf(endStr);
-  ans = data.substring(s, e);
+  // ------------------------- BPN --------------------------
+  else if (option == "bpn")
+    if(Serial2.available()){
+        String msg = Serial2.readStringUntil('\n');
+        Serial.println("bpn from Serial2: "); 
+        Serial.println(msg);
+    }
+    else Serial.print("\tSerial2 is not available!!! >> 2");
+  // --------------------------------------------------------
   
-  if (ans == "") return "-1";
-  else return ans;
+  // --------------------- temperature ----------------------
+  else if (option == "temperature")
+    if(Serial3.available()){
+        String msg = Serial3.readStringUntil('\n');
+        Serial.println("temperature from Serial3: "); 
+        Serial.println(msg);
+    }
+    else Serial.print("\tSerial3 is not available!!! >> 3");
+  // --------------------------------------------------------
+
+  ReadServer();
 }
