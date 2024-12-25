@@ -10,15 +10,14 @@ EthernetClient client;
 
 // variables
 unsigned long end_time, start_time;
-unsigned short delay_time=3000, delay_get_data=1000, late=60000;
-String heartbeats_r="-1", oxygen_r="-1", weight_r="-1", temperature_r="-1", flg="", height_r="-1";
+unsigned short delay_time=500, delay_get_data=2000;
+String heartbeats_r="-1", oxygen_r="-1", weight_r="-1", temperature_r="-1", flg="";
 int counter=0, cc=5;
-int pin_esp_blue=46, pin_esp_w=47;
 
-// this data, setting for serial port read DATA
+// this data, setting for serial port read DATA 
 int wsp = 1; // for weight.
-int hsp = 2; // for hearthbeats
-int osp = 2; // for oxygen
+int hsp = 1; // for hearthbeats
+int osp = 1; // for oxygen
 int tsp = 0; // for tempreture
 
 
@@ -39,9 +38,6 @@ void setup() {
   Serial.print(F("IP Address: "));
   Serial.println(Ethernet.localIP());
   pinMode(30,OUTPUT);
- 
-  pinMode(pin_esp_blue, OUTPUT);
-  pinMode(pin_esp_w, OUTPUT);
 
 }
 
@@ -49,30 +45,18 @@ void loop() {
 
 ReadServer(); // check connect to server
 delay(delay_time);
-print_flag();
+print_flag(); // get flag value
 flg = get_data("xflag=", "endf");
 Serial.println(flg);
-// Write2Server(client, "33", "33", "33", "33"); // for test
 
 if (flg == "1") { // access to collect data from another Microcontroller
   Serial.println("---------------<< Flag 1 >>---------------");
   bool status[4];
-  for (int i=0; i<4; i++) status[i]=true; // true: yet not get data
+  for (int i=0; i<4; i++) status[i]=true; // true: yet not get data 
 
-  if (true){
+//   if (result == "true"){
+  if (true){ 
     start_time = millis();
-
-    // Enable esp bluetooth
-    digitalWrite(pin_esp_blue, LOW);
-    delay(100);
-    digitalWrite(pin_esp_blue, HIGH);
-
-    // Enable esp weight
-    digitalWrite(pin_esp_w, LOW);
-    delay(100);
-    digitalWrite(pin_esp_w, HIGH);
-   
-   
     while (true){
     delay(delay_get_data);
     Serial.println("---------------<< getting data >>---------------");
@@ -81,32 +65,23 @@ if (flg == "1") { // access to collect data from another Microcontroller
     counter = 0;
     while (status[0] && (counter<cc)){
       weight_r = read_uart(wsp, "weight=", "endw");
-      if (weight_r != "-1") {status[0] = false;Serial.println("++++++++++++ " + weight_r);
-        break;}
+      if (weight_r != "-1") status[0] = false;
     counter++;
     }
     // ----------------------------------------    
 
-    // digitalWrite(pin_esp_blue, LOW);
-    // delay(100);
-    // digitalWrite(pin_esp_blue, HIGH);
-    
     // -------------- BPN (2) --------------
     counter = 0;
     while (status[1] && (counter<cc)){
       heartbeats_r = read_uart(hsp, "heartbeat=", "endhb");
-      if (heartbeats_r != "-1") {status[1] = false;break;}
+      if (heartbeats_r != "-1") status[1] = false;
     counter++;
     }
 
-   
-    digitalWrite(pin_esp_blue, LOW);
-    delay(100);
-    digitalWrite(pin_esp_blue, HIGH);
     counter = 0;
     while (status[2] && counter<cc){
       oxygen_r = read_uart(osp, "oxygen=", "endo");
-      if (oxygen_r != "-1") {status[2] = false;break;}
+      if (oxygen_r != "-1") status[2] = false;
     counter++;
     }
     // -------------------------------------
@@ -116,20 +91,19 @@ if (flg == "1") { // access to collect data from another Microcontroller
     temperature_r = "0"; status[3] = false; // for test
     // ---------------------------------------------
 
-    Serial.print("Heartbeats: ");    Serial.print(heartbeats_r);
-    Serial.print(", Oxygen: ");      Serial.print(oxygen_r);
-    Serial.print(", Weight: ");      Serial.print(weight_r);
-    Serial.print(", Temperature: "); Serial.println(temperature_r);
-     
-
-    if (true ^ (status[0] || status[1] || status[2] || status[3])) break; // ^ == XOR
-   
+    if (true ^ (status[0] || status[1] || status[2] || status[3])){ // ^ == XOR
+      Serial.print("Heartbeats: ");    Serial.print(heartbeats_r);
+      Serial.print(", Oxygen: ");      Serial.print(oxygen_r);
+      Serial.print(", Weight: ");      Serial.print(weight_r);
+      Serial.print(", Temperature: "); Serial.println(temperature_r);
+      break;
+    }
     end_time = millis();
     Serial.print("\n\t\t\tTIMER: ");
-    Serial.print((end_time - start_time)/1000);
+    Serial.print(end_time - start_time);
     Serial.print('\n');
 
-    if (end_time - start_time > late) {Write2Flag(client);break;}
+    if (end_time - start_time > delay_get_data * 10) break;
 
     }
   }
@@ -140,31 +114,30 @@ if (flg == "1") { // access to collect data from another Microcontroller
 }
 delay(delay_time);
 heartbeats_r="-1"; oxygen_r="-1"; weight_r="-1"; temperature_r="-1";
-flg="";request="";Serial.println("-------------- end -----------");
+flg="";request="";
 }
 
 void ReadServer() {
+  // request = "";
     while (client.available()) {
     char c = client.read();
     String mystring(c);
     request+=mystring;
   }
- 
   Serial.print("request: ");
   Serial.println(request);
 }
 
-void print_flag() {
+void print_flag() { 
   // read flag from server  
   client.stop();
   if (client.connect(server, 80)) {
    
-    Serial.println("connecting... (print_flag)");
+    Serial.println("connecting...");
     client.println("GET /sql_personal_data/read_variables_from_server.php? HTTP/1.1");
     client.println("Host: 192.168.2.50");
     client.println("Connection: close");
-    client.println("");
-//    client.stop();
+    client.println();
 
   } else {
     Serial.println("connection failed - (print_flag)");
@@ -172,8 +145,7 @@ void print_flag() {
 }
 
 void Write2Server(EthernetClient client, String heartbeat, String oxygen, String weight_kg, String temperature) {
-
-      client.stop();
+   
       if(client.connect(server, 80)){
         Serial.println("Uploading.... (Write2Server)");
         client.print("GET /sql_personal_data/write_variables_to_server.php?"); //Connecting and Sending values to database
@@ -185,7 +157,7 @@ void Write2Server(EthernetClient client, String heartbeat, String oxygen, String
         // | sens_4 = temperature |
         // | sens_5 = None        |
         // +----------------------+
-     
+      
         // send data
         client.print("sens_1=");
         client.print(heartbeat);
@@ -197,11 +169,8 @@ void Write2Server(EthernetClient client, String heartbeat, String oxygen, String
         client.print(temperature);
         // client.print("&sens_5=");
         // client.println(999);
-       
-//        client.println("Host: 192.168.2.50");
-//        client.println("Connection: close");
-       
-        client.println();
+
+        client.println(" ");
 
         client.stop(); //Closing the connection
       }
@@ -212,8 +181,7 @@ void Write2Server(EthernetClient client, String heartbeat, String oxygen, String
  }
 
 void Write2Flag(EthernetClient client) {
-
-    client.stop();
+   
     if(client.connect(server, 80)){
     Serial.println("Uploading.... (Write2Flag)");
     client.print("GET /sql_personal_data/write_flag_to_server.php?"); //Connecting and Sending values to database
@@ -228,7 +196,7 @@ void Write2Flag(EthernetClient client) {
   }
 
 String get_data(String start, String end) {
- 
+  
   String H_Rel = start;
   int Relstart = request.indexOf(H_Rel);
   String F_Rel = end;
@@ -236,43 +204,32 @@ String get_data(String start, String end) {
   String RelStatus = request.substring(Relstart+H_Rel.length(), Relstop);
   Serial.print("RelStatus: ");
   Serial.println(RelStatus);
-  if (RelStatus != "-1") return RelStatus;
+  if (RelStatus != "-1") return RelStatus; 
 }
 
 String read_uart(int serial_port, String startStr, String endStr) {
 
-  String data="", ans="";
-//  Serial1.flush(); Serial2.flush(); Serial3.flush();
-
+  String data, ans;
   switch (serial_port)
   {
   case 1:
-    Serial1.begin(9600);
     data = Serial1.readStringUntil('\n');
-    Serial1.end();
     break;
- 
+  
   case 2:
-    Serial2.begin(9600);
     data = Serial2.readStringUntil('\n');
-    Serial2.end();
     break;
- 
+  
   case 3:
-    Serial3.begin(9600);
     data = Serial3.readStringUntil('\n');
-    Serial3.end();
     break;
-   
   }
- 
-  Serial.print(serial_port);
+
   Serial.println(">>>>>>>>>>>>>>> " + data);
   int s = data.indexOf(startStr) + startStr.length() ;
   int e = data.indexOf(endStr);
   ans = data.substring(s, e);
-
- 
+  
   if (ans == "") return "-1";
   else return ans;
 }
